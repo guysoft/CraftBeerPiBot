@@ -24,6 +24,7 @@ from urllib.request import urlopen, URLError
 import time
 import pytz
 import subprocess
+import requests
 
 DIR = os.path.dirname(__file__)
 
@@ -136,8 +137,10 @@ def handle_cancel(update):
 
 
 class Bot:
-    def __init__(self, token):
+    def __init__(self, token, craftbeerpi_url):
         self.selected_continent = ""
+        self.craftbeerpi_url = craftbeerpi_url
+
         logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
         self.updater = Updater(token=token)
@@ -167,6 +170,9 @@ class Bot:
         self.dispatcher.add_handler(time_handler)
 
         status_handler = CommandHandler('status', self.status)
+        self.dispatcher.add_handler(status_handler)
+
+        status_handler = CommandHandler('toggle_kettle_1', self.toggle_kettle_1)
         self.dispatcher.add_handler(status_handler)
 
         self.dispatcher.add_error_handler(self.error_callback)
@@ -222,6 +228,25 @@ class Bot:
         bot.send_message(chat_id=update.message.chat_id, text="Perhaps another time")
         return
 
+    def toggle_kettle_1(self, bot, update):
+        r = requests.post(self.craftbeerpi_url + '/api/kettle/1/automatic', data={'id': '1'})
+        bot.send_message(chat_id=update.message.chat_id, text="Kettle states:" + self.get_kettles_state())
+        return
+
+    def get_kettles_state(self):
+        return_value = []
+        r = requests.get(self.craftbeerpi_url + '/api/kettle/state')
+        kettles = json.loads(r.text)
+        for i in kettles.keys():
+            state = kettles[i]["automatic"]
+            if state:
+                state = "on"
+            else:
+                state = "off"
+            return_value.append(i + " " + state)
+        return "\n".join(return_value)
+
+
     def error_callback(self, bot, update, error):
         try:
             raise error
@@ -252,6 +277,7 @@ class Bot:
         commands = [["/status", "Check temps status"],
                     ["/timezone", "Set the timezone (only works if sudo requires no password)"],
                     ["/time", "Print time and timezone on device"],
+                    ["/toggle_kettle_1", "toggle starting the first PID"],
                     ["/help", "Get this message"]
                     ]
 
@@ -270,6 +296,10 @@ class Bot:
         reply = "Temps status :\n"
         for i in glob.glob(os.path.join(log_dir, "*.templog")):
             reply += os.path.basename(i) + ": " + get_temp(i) + "\n"
+
+        reply += "\nPID status :\n"
+        reply += self.get_kettles_state()
+
 
         bot.send_message(chat_id=update.message.chat_id, text=reply)
         return
@@ -296,6 +326,8 @@ def wait_for_internet():
 if __name__ == "__main__":
     config_file_path = os.path.join(DIR, "config.ini")
     settings = ini_to_dict(config_file_path)
+    craftbeerpi_url = settings["main"]["url"]
+
     if not config_file_path:
         print("Error, no config file")
         sys.exit(1)
@@ -304,6 +336,6 @@ if __name__ == "__main__":
 
     wait_for_internet()
 
-    a = Bot(settings["main"]["token"])
+    a = Bot(settings["main"]["token"], craftbeerpi_url)
     a.run()
     print("Bot Started")
