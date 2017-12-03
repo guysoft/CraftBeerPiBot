@@ -1,6 +1,6 @@
 INSTALL_PATH=$(realpath $(dirname $0))
 SCRIPT_PATH=${INSTALL_PATH}/config/craftbeerpibot.service
-EXEC_PATH=${INSTALL_PATH}/crafteerpibot.py
+EXEC_PATH=${INSTALL_PATH}/craftbeerpibot.py
 LOG_PATH=${INSTALL_PATH}/stdout.log
 
 if [ "$#" -gt 0 ]; then
