@@ -239,11 +239,12 @@ class Bot:
         kettles = json.loads(r.text)
         for i in kettles.keys():
             state = kettles[i]["automatic"]
+            target_temp = str(kettles[i]["target_temp"])
             if state:
                 state = "on"
             else:
                 state = "off"
-            return_value.append(i + " " + state)
+            return_value.append(i + " " + state + ", \u2316: " + target_temp + "C")
         return "\n".join(return_value)
 
 
@@ -292,13 +293,17 @@ class Bot:
         return
 
     def status(self, bot, update):
-        log_dir = os.path.expanduser(os.path.join("~", "CraftBeerPi", "log"))
-        reply = "Temps status :\n"
-        for i in glob.glob(os.path.join(log_dir, "*.templog")):
-            reply += os.path.basename(i) + ": " + get_temp(i) + "\n"
-
+        reply = ""
         reply += "\nPID status :\n"
-        reply += self.get_kettles_state()
+        reply += self.get_kettles_state() + "\n\n"
+
+        r = requests.get(self.craftbeerpi_url + '/api/thermometer/last')
+        thermometers = json.loads(r.text)
+
+        reply += "Temps status :\n"
+        for key in thermometers.keys():
+            reply += emojize(":thermometer: " + str(key) + ": " + str(thermometers[key]) + "C\n",
+                             use_aliases=True)
 
 
         bot.send_message(chat_id=update.message.chat_id, text=reply)
