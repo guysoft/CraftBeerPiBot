@@ -70,51 +70,6 @@ def get_timezones():
     return return_value
 
 
-def tail(filepath):
-    """
-    @author Marco Sulla (marcosullaroma@gmail.com)
-    @date May 31, 2016
-    """
-
-    try:
-        filepath.is_file
-        fp = str(filepath)
-    except AttributeError:
-        fp = filepath
-
-    with open(fp, "rb") as f:
-        size = os.stat(fp).st_size
-        start_pos = 0 if size - 1 < 0 else size - 1
-
-        if start_pos != 0:
-            f.seek(start_pos)
-            char = f.read(1)
-
-            if char == b"\n":
-                start_pos -= 1
-                f.seek(start_pos)
-
-            if start_pos == 0:
-                f.seek(start_pos)
-            else:
-                char = ""
-
-                for pos in range(start_pos, -1, -1):
-                    f.seek(pos)
-
-                    char = f.read(1)
-
-                    if char == b"\n":
-                        break
-
-        return f.readline()
-
-
-def get_temp(file_path):
-    last_list = tail(file_path).decode("utf-8")
-    return str(last_list.split(",")[1]) + "/" + str(last_list.split(",")[2])
-
-
 class TelegramCallbackError(Exception):
     def __init__(self, message=""):
         self.message = message
@@ -172,11 +127,29 @@ class Bot:
         status_handler = CommandHandler('status', self.status)
         self.dispatcher.add_handler(status_handler)
 
-        status_handler = CommandHandler('toggle_kettle_1', self.toggle_kettle_1)
-        self.dispatcher.add_handler(status_handler)
+        toggle_kettle_1_handler = CommandHandler('toggle_kettle_1', self.toggle_kettle_1)
+        self.dispatcher.add_handler(toggle_kettle_1_handler)
+
+        self.SET_KETTLE_1_TEMP = range(1)
+        set_kettle_1_handler = ConversationHandler(
+            entry_points=[CommandHandler('set_kettle_1', self.start_set_kettle_1)],
+            states={
+
+                self.SET_KETTLE_1_TEMP: [RegexHandler('^(.*)$', self.set_kettle_1)]
+            },
+            fallbacks=[]
+        )
+
+        self.dispatcher.add_handler(set_kettle_1_handler)
 
         self.dispatcher.add_error_handler(self.error_callback)
 
+        return
+
+    def set_temp(self, pid, temp):
+        headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+        r = requests.post(self.craftbeerpi_url + '/api/kettle/' + str(int(pid)) + "/targettemp", data=json.dumps({'temp': int(temp)}), headers=headers)
+        print(r.text)
         return
 
     def start(self, bot, update):
@@ -233,6 +206,17 @@ class Bot:
         bot.send_message(chat_id=update.message.chat_id, text="Kettle states:" + self.get_kettles_state())
         return
 
+
+    def start_set_kettle_1(self, bot, update):
+        bot.send_message(chat_id=update.message.chat_id, text="Input Kettle Temp:")
+        return self.SET_KETTLE_1_TEMP
+
+    def set_kettle_1(self, bot, update):
+        temp = update.message.text.strip()
+        self.set_temp(1, temp)
+        bot.send_message(chat_id=update.message.chat_id, text="Kettle temp set\n" + self.get_kettles_state())
+        return ConversationHandler.END
+
     def get_kettles_state(self):
         return_value = []
         r = requests.get(self.craftbeerpi_url + '/api/kettle/state')
@@ -279,6 +263,7 @@ class Bot:
                     ["/timezone", "Set the timezone (only works if sudo requires no password)"],
                     ["/time", "Print time and timezone on device"],
                     ["/toggle_kettle_1", "toggle starting the first PID"],
+                    ["/set_kettle_1", "set target temp on kettle 1"],
                     ["/help", "Get this message"]
                     ]
 
