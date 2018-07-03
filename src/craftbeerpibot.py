@@ -127,6 +127,9 @@ class Bot:
         status_handler = CommandHandler('status', self.status)
         self.dispatcher.add_handler(status_handler)
 
+        chart_handler = CommandHandler('chart', self.chart)
+        self.dispatcher.add_handler(chart_handler)
+
         toggle_kettle_1_handler = CommandHandler('toggle_kettle_1', self.toggle_kettle_1)
         self.dispatcher.add_handler(toggle_kettle_1_handler)
 
@@ -260,6 +263,7 @@ class Bot:
         text = icon + " The following commands are available:\n"
 
         commands = [["/status", "Check temps status"],
+                    ["/chart", "Temp chart of kettle 1"]
                     ["/timezone", "Set the timezone (only works if sudo requires no password)"],
                     ["/time", "Print time and timezone on device"],
                     ["/toggle_kettle_1", "toggle starting the first PID"],
@@ -289,6 +293,20 @@ class Bot:
         for key in thermometers.keys():
             reply += emojize(":thermometer: " + str(key) + ": " + str(thermometers[key]) + "C\n",
                              use_aliases=True)
+
+
+        bot.send_message(chat_id=update.message.chat_id, text=reply)
+        return
+
+    def chart(self, bot, update):
+        reply = ""
+
+        r = requests.get(self.craftbeerpi_url + '/api/temp/K/1/chart')
+        chart_data = json.loads(r.text)
+
+        reply += str(chart_data["data"].keys(), str(chart_data["name"]))
+
+
 
 
         bot.send_message(chat_id=update.message.chat_id, text=reply)
