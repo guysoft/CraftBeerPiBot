@@ -2,3 +2,12 @@ python-telegram-bot
 emoji
 pytz
 requests
+Flask
+flask-bootstrap
+wtforms
+sqlalchemy
+werkzeug
+flask-login
+flask-bootstrap
+flask-sqlalchemy
+flask_wtf
