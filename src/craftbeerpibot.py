@@ -25,6 +25,8 @@ import time
 import pytz
 import subprocess
 import requests
+from sqlalchemy import create_engine
+from database import insert_new_user_to_db, mysql_init_db, has_user, restricted
 
 DIR = os.path.dirname(__file__)
 
@@ -93,6 +95,7 @@ def handle_cancel(update):
 
 class Bot:
     def __init__(self, token, craftbeerpi_url):
+        self.engine = create_engine(get_uri(settings))
         self.selected_continent = ""
         self.craftbeerpi_url = craftbeerpi_url
 
@@ -153,10 +156,15 @@ class Bot:
         return
 
     def start(self, bot, update):
+        if not has_user(self.engine, update.message.from_user.id):
+            insert_new_user_to_db(self.engine, update.message.from_user.id, update.message.from_user.full_name)
         bot.send_message(chat_id=update.message.chat_id,
-                         text="I'm a bot to do stuff with CraftBeerPi, please type /help for info")
+                         text="I'm a bot to do stuff with CraftBeerPi, please type /help for info"
+                              "Please add yourself as an admin in the web interface to control the bot at:"
+                              "http://craftbeerpi.local:5001")
         return
 
+    @restricted
     def set_timezone(self, bot, update):
         keyboard = []
 
@@ -201,12 +209,13 @@ class Bot:
         bot.send_message(chat_id=update.message.chat_id, text="Perhaps another time")
         return
 
+    @restricted
     def toggle_kettle_1(self, bot, update):
         r = requests.post(self.craftbeerpi_url + '/api/kettle/1/automatic', data={'id': '1'})
         bot.send_message(chat_id=update.message.chat_id, text="Kettle states:" + self.get_kettles_state())
         return
 
-
+    @restricted
     def start_set_kettle_1(self, bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="Input Kettle Temp:")
         return self.SET_KETTLE_1_TEMP
@@ -217,6 +226,7 @@ class Bot:
         bot.send_message(chat_id=update.message.chat_id, text="Kettle temp set\n" + self.get_kettles_state())
         return ConversationHandler.END
 
+    @restricted
     def get_kettles_state(self):
         return_value = []
         r = requests.get(self.craftbeerpi_url + '/api/kettle/state')
@@ -272,11 +282,13 @@ class Bot:
 
         bot.send_message(chat_id=update.message.chat_id, text=text)
 
+    @restricted
     def time(self, bot, update):
         reply, _ = run_command(["date"])
         bot.send_message(chat_id=update.message.chat_id, text=reply)
         return
 
+    @restricted
     def status(self, bot, update):
         reply = ""
         reply += "\nPID status :\n"
@@ -314,18 +326,27 @@ def wait_for_internet():
 
 
 if __name__ == "__main__":
-    config_file_path = os.path.join(DIR, "config.ini")
-    settings = ini_to_dict(config_file_path)
-    craftbeerpi_url = settings["main"]["url"]
+    from common import get_config, CONFIG_PATH, get_uri_without_db, get_uri
+    from webserver import webserver
 
-    if not config_file_path:
+    settings = get_config()
+
+    mysql_init_db(get_uri_without_db(settings), settings)
+    webserver.init_db(get_uri(settings))
+
+    if not CONFIG_PATH:
         print("Error, no config file")
         sys.exit(1)
+
     if ("main" not in settings) or ("token" not in settings["main"]):
         print("Error, no token in config file")
 
     wait_for_internet()
 
-    a = Bot(settings["main"]["token"], craftbeerpi_url)
+    a = Bot(settings["main"]["token"], settings)
     a.run()
     print("Bot Started")
+
+    webserver.run()
+    print("Webserver started")
+
