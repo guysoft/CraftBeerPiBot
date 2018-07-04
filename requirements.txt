@@ -11,3 +11,4 @@ flask-login
 flask-bootstrap
 flask-sqlalchemy
 flask_wtf
+mysql-connector-python-rf
