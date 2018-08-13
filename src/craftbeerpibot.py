@@ -94,10 +94,10 @@ def handle_cancel(update):
 
 
 class Bot:
-    def __init__(self, token, craftbeerpi_url):
+    def __init__(self, token, settings):
         self.engine = create_engine(get_uri(settings))
         self.selected_continent = ""
-        self.craftbeerpi_url = craftbeerpi_url
+        self.craftbeerpi_url = settings["main"]["url"]
 
         logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -226,7 +226,6 @@ class Bot:
         bot.send_message(chat_id=update.message.chat_id, text="Kettle temp set\n" + self.get_kettles_state())
         return ConversationHandler.END
 
-    @restricted
     def get_kettles_state(self):
         return_value = []
         r = requests.get(self.craftbeerpi_url + '/api/kettle/state')
