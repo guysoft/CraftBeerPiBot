@@ -49,7 +49,9 @@ def has_access(engine, telegram_id, roles):
     Session.configure(bind=engine)
     session = Session()
     result = session.query(TelegramUser).filter(TelegramUser.id == telegram_id).first()
-    return result.role in roles
+    if result is not None:
+        return result.role in roles
+    return False
 
 def has_user(engine, telegram_id):
     Session = sessionmaker()
